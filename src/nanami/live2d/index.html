@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Nanami</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: transparent;
+    overflow: hidden;
+    height: 100%;
+    user-select: none;
+  }
+  #stage {
+    position: relative;
+    width: 100%; height: 100%;
+  }
+  #bubble {
+    position: absolute;
+    left: 50%;
+    bottom: 78%;
+    transform: translateX(-50%);
+    max-width: 260px;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.95);
+    color: #333;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    display: none;
+    word-break: break-word;
+  }
+  #bubble::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -8px;
+    transform: translateX(-50%);
+    border: 8px solid transparent;
+    border-top-color: rgba(255, 255, 255, 0.95);
+  }
+  #character {
+    position: absolute;
+    bottom: 14%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 160px; height: 160px;
+    cursor: pointer;
+    animation: float 3s ease-in-out infinite;
+  }
+  #character.talking {
+    animation: float 3s ease-in-out infinite, bob 0.4s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { margin-bottom: 0; }
+    50% { margin-bottom: 12px; }
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateX(-50%) rotate(0deg); }
+    50% { transform: translateX(-50%) rotate(-4deg); }
+  }
+  #mouth { transition: all 0.1s ease; }
+  #character.talking #mouth { ry: 12; rx: 6; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="bubble"></div>
+  <div id="character" onclick="onCharacterClick()">
+    <svg width="160" height="160" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="46" fill="#ffb6c1"/>
+      <circle cx="50" cy="50" r="46" fill="none" stroke="#ff8fa3" stroke-width="2"/>
+      <circle cx="34" cy="44" r="6" fill="#4a4a4a"/>
+      <circle cx="66" cy="44" r="6" fill="#4a4a4a"/>
+      <circle cx="32" cy="42" r="2" fill="#fff"/>
+      <circle cx="64" cy="42" r="2" fill="#fff"/>
+      <ellipse id="mouth" cx="50" cy="60" rx="10" ry="5" fill="#4a4a4a"/>
+      <circle cx="26" cy="30" r="10" fill="#ffffff" opacity="0.35"/>
+    </svg>
+  </div>
+</div>
+
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script>
+  // 通过 QWebChannel 获取 Python 侧的 bridge 对象
+  var bridge = null;
+  if (window.qt && qt.webChannelTransport) {
+    new QWebChannel(qt.webChannelTransport, function (channel) {
+      bridge = channel.objects.bridge;
+    });
+  }
+
+  function onCharacterClick() {
+    if (bridge) bridge.notifyCharacterClicked();
+  }
+
+  var bubbleTimer = null;
+  var char = document.getElementById('character');
+  var bubble = document.getElementById('bubble');
+
+  // Python 侧调用 window.nanamiSpeak(text) 触发说话动画
+  window.nanamiSpeak = function (text) {
+    if (!text) return;
+    bubble.textContent = text;
+    bubble.style.display = 'block';
+    char.classList.add('talking');
+    if (bubbleTimer) clearTimeout(bubbleTimer);
+    bubbleTimer = setTimeout(function () {
+      bubble.style.display = 'none';
+      char.classList.remove('talking');
+    }, Math.max(2500, text.length * 180));
+  };
+
+  // 用户在此输入时（若通过页面内输入），转发给 Python
+  window.nanamiSubmit = function (text) {
+    if (bridge) bridge.sendUserInput(text);
+  };
+</script>
+</body>
+</html>
