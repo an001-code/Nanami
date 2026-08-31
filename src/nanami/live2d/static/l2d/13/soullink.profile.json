@@ -1,0 +1,50 @@
+{
+  "modelId": "13_a0ea2661",
+  "displayName": "13",
+  "version": "1.0.0",
+  "modelPath": "/l2d/13/13.model3.json",
+  "sourceSignature": {
+    "modelDir": "13",
+    "model3File": "13.model3.json",
+    "hash": "a0ea2661f34efb68fcbd59183826e693650ee0b2bf1a71a6827234330a7b3519",
+    "generatedAt": "2026-08-29T13:21:09.938Z"
+  },
+  "autoProfile": {
+    "provider": "heuristic",
+    "promptVersion": "soullink-profile-autogen-v3",
+    "generatedAt": "2026-08-29T13:21:09.938Z",
+    "notes": [
+      "Generated from model3/cdi3 parameter names.",
+      "LLM may refine this profile when OpenAI-compatible settings are enabled."
+    ]
+  },
+  "schemaVersion": 2,
+  "capabilities": {
+    "headControl": false,
+    "bodyControl": false,
+    "eyeBlink": false,
+    "eyeSmile": false,
+    "gazeControl": false,
+    "mouthOpen": false,
+    "mouthSmile": false,
+    "browControl": false,
+    "blush": false,
+    "tear": false,
+    "sweat": false,
+    "breath": false
+  },
+  "parameterMap": {},
+  "idleConfig": {},
+  "reactionBias": {
+    "shy": {
+      "blushMultiplier": 1.1,
+      "gazeAwayMultiplier": 1.05
+    },
+    "happy": {
+      "mouthSmileMultiplier": 1,
+      "eyeSmileMultiplier": 1
+    }
+  },
+  "neutralParams": {},
+  "parameterSmoothing": {}
+}

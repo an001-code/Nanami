@@ -22,7 +22,7 @@ from .web_bridge import WebBridge
 class MainWindow(QWidget):
     user_submitted = Signal(str)
 
-    def __init__(self) -> None:
+    def __init__(self, name: str = "七海") -> None:
         super().__init__()
         self._drag_pos = None
         self._base_size = (360, 480)
@@ -51,7 +51,7 @@ class MainWindow(QWidget):
         self.view.page().setWebChannel(channel)
 
         self.input = QLineEdit(self)
-        self.input.setPlaceholderText("和七海说点什么…")
+        self.input.setPlaceholderText(f"和{name}说点什么…")
         self.send_btn = QPushButton("发送", self)
 
         input_bar = QWidget(self)
@@ -104,6 +104,9 @@ class MainWindow(QWidget):
 
     def load_url(self, url: str) -> None:
         self.view.load(QUrl(url))
+
+    def set_pet_name(self, name: str) -> None:
+        self.input.setPlaceholderText(f"和{name}说点什么…")
 
     def _on_submit(self) -> None:
         text = self.input.text().strip()

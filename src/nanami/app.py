@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from .agent.agent import NanamiAgent
 from .agent.llm import build_llm
-from .config import DEFAULT_CONFIG_PATH, PROJECT_ROOT, load_config, resolve_api_key
+from .config import DEFAULT_CONFIG_PATH, PROJECT_ROOT, get_pet_name, load_config, resolve_api_key
 from .memory.embedder import QwenEmbedder
 from .memory.history import ConversationHistory
 from .memory.manager import MemoryManager
@@ -19,6 +19,7 @@ from .memory.profile import ProfileManager, ProfileStore
 from .memory.summarizer import MemorySummarizer
 from .memory.vector_store import VectorStore
 from .memory.work_memory import WorkMemory
+from .model_importer import ModelImporter
 from .permissions.policy import PermissionPolicy
 from .tools.registry import build_tools
 from .ui.dashboard_bridge import DashboardBridge
@@ -81,15 +82,7 @@ class AgentRunner(QObject):
 
     def _synthesize(self, text: str) -> str:
         try:
-            v = self.cfg["voice"]["tts"]
-            return str(
-                synthesize(
-                    text,
-                    voice=v["voice"],
-                    rate=v.get("rate", "+0%"),
-                    volume=v.get("volume", "+0%"),
-                )
-            )
+            return str(synthesize(text, **self.cfg["voice"]["tts"]))
         except Exception:  # noqa: BLE001 - TTS 失败不影响文字回复
             return ""
 
@@ -127,7 +120,9 @@ def _build_memory(cfg: dict) -> MemoryManager:
         ProfileStore(redis_client, mem_cfg["redis"]["key_prefix"] + "profile")
     )
     history = ConversationHistory(mem_cfg["postgres"]["dsn"])
-    summarizer = MemorySummarizer(build_llm(cfg, temperature=0))
+    summarizer = MemorySummarizer(
+        build_llm(cfg, temperature=0), name_getter=lambda: get_pet_name(cfg)
+    )
     return MemoryManager(cfg, vs, wm, pm, summarizer, history)
 
 
@@ -166,21 +161,32 @@ def main(argv: list[str] | None = None) -> int:
     model = cfg.get("live2d", {}).get("model", "LSS")
 
     # 仪表盘（第二窗口，托盘菜单打开；不自动显示）
-    dashboard_bridge = DashboardBridge(
-        memory, cfg, DEFAULT_CONFIG_PATH, static_dir / "l2d"
+    model_importer = ModelImporter(
+        PROJECT_ROOT / "soullink-emotion-sdk", static_dir / "l2d"
     )
+    dashboard_bridge = DashboardBridge(
+        memory, cfg, DEFAULT_CONFIG_PATH, static_dir / "l2d", model_importer
+    )
+    pet_name = get_pet_name(cfg)
     dashboard = DashboardWindow(
-        dashboard_bridge, f"{server.base_url}/dashboard/index.html"
+        dashboard_bridge, f"{server.base_url}/dashboard/index.html", name=pet_name
     )
 
     # UI
-    window = MainWindow()
+    window = MainWindow(pet_name)
     window.load_url(f"{server.base_url}/index.html?model={model}")
     runner = AgentRunner(agent, cfg)
     runner.reply_ready.connect(window.speak)
     window.user_submitted.connect(runner.ask)
 
-    tray = create_tray(app, window, open_dashboard=dashboard.show_and_raise)
+    dashboard_bridge.model_changed.connect(
+        lambda mid: window.load_url(f"{server.base_url}/index.html?model={mid}")
+    )
+
+    tray = create_tray(app, window, open_dashboard=dashboard.show_and_raise, name=pet_name)
+    dashboard_bridge.pet_name_changed.connect(
+        lambda n: (window.set_pet_name(n), tray.setToolTip(n), dashboard.set_pet_name(n))
+    )
     window.move_to_bottom_right()
     window.show()
 

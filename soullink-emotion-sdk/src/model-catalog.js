@@ -5,6 +5,20 @@ export const modelCatalog = [
     modelFile: "LSS.model3.json",
     displayName: "LSS",
     view: { scale: 1, x: 0, y: 0 }
+  },
+  {
+    id: "13",
+    modelDir: "13",
+    modelFile: "13.model3.json",
+    displayName: "13",
+    view: { scale: 1, x: 0, y: 0 }
+  },
+  {
+    id: "hiyori_pro_t11",
+    modelDir: "hiyori_pro_t11",
+    modelFile: "hiyori_pro_t11.model3.json",
+    displayName: "hiyori_pro_t11",
+    view: { scale: 1, x: 0, y: 0 }
   }
 ];
 

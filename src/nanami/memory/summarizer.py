@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import Callable
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -13,8 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class MemorySummarizer:
-    def __init__(self, llm: BaseChatModel) -> None:
+    def __init__(self, llm: BaseChatModel, name_getter: Callable[[], str] | None = None) -> None:
         self._llm = llm
+        self._name_getter = name_getter or (lambda: "七海")
         self._profile_llm = None
         try:
             self._profile_llm = llm.with_structured_output(ProfileUpdate, method="json_mode")
@@ -22,10 +24,11 @@ class MemorySummarizer:
             logger.warning("画像结构化输出初始化失败，将用容错 JSON 解析：%s", e)
 
     def summarize_turn(self, user_text: str, reply_text: str) -> str:
+        name = self._name_getter()
         prompt = (
-            "请用一句中文概括下面这轮对话的核心内容（用户说了什么、七海回应了什么，"
+            f"请用一句中文概括下面这轮对话的核心内容（用户说了什么、{name}回应了什么，"
             "以及涉及的事实、偏好或决定），只输出这一句概括，不要加任何前缀或解释：\n\n"
-            f"用户：{user_text}\n七海：{reply_text}"
+            f"用户：{user_text}\n{name}：{reply_text}"
         )
         try:
             resp = self._llm.invoke(prompt)
@@ -80,14 +83,14 @@ class MemorySummarizer:
             logger.warning("画像提取兜底失败：%s", e)
             return None
 
-    @staticmethod
-    def _profile_prompt(user_text: str, reply_text: str) -> str:
+    def _profile_prompt(self, user_text: str, reply_text: str) -> str:
+        name = self._name_getter()
         return (
             "请从下面这轮对话中提取用户的信息，输出 JSON 对象，字段："
             "name（用户名字，没有则 null）、preferences（偏好列表）、"
             "impressions（你对用户性格/印象的判断列表）、facts（用户提到的事实列表）。"
             "没有的字段给空列表。只输出 JSON，不要加任何其他内容。\n\n"
-            f"用户：{user_text}\n七海：{reply_text}"
+            f"用户：{user_text}\n{name}：{reply_text}"
         )
 
     @staticmethod

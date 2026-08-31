@@ -6,6 +6,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
 
+from ..config import get_pet_name
 from ..memory.manager import MemoryManager
 from ..permissions.policy import PermissionPolicy
 from .graph import build_graph
@@ -108,7 +109,7 @@ class NanamiAgent:
         memories_text = self.memory.build_memories_text(text)
         summary, recent = self.memory.load_work_memory()
 
-        system = build_system_prompt(profile_text, memories_text)
+        system = build_system_prompt(profile_text, memories_text, name=get_pet_name(self.cfg))
         messages: list = []
         if summary:
             messages.append(HumanMessage(content=f"[之前的对话摘要]\n{summary}"))

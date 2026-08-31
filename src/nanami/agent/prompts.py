@@ -1,7 +1,7 @@
 """系统提示词：定义桌宠人格。"""
 from __future__ import annotations
 
-SYSTEM_PROMPT = """你是一只常驻 Windows 桌面的智能桌宠，名字叫「七海（Nanami）」。
+SYSTEM_PROMPT = """你是一只常驻 Windows 桌面的智能桌宠，名字叫「{name}」。
 
 你的性格：
 - 活泼、温暖、有点俏皮，会主动关心用户。
@@ -28,9 +28,9 @@ SYSTEM_PROMPT = """你是一只常驻 Windows 桌面的智能桌宠，名字叫�
 """
 
 
-def build_system_prompt(profile: str = "", memories: str = "") -> str:
+def build_system_prompt(profile: str = "", memories: str = "", name: str = "七海") -> str:
     """拼装系统提示词，可选注入用户画像与相关历史对话。"""
-    parts = [SYSTEM_PROMPT]
+    parts = [SYSTEM_PROMPT.replace("{name}", name)]
     if profile:
         parts.append(f"\n\n【用户画像】\n{profile}")
     if memories:

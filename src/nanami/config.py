@@ -18,6 +18,11 @@ def load_config(path: Path | None = None) -> dict[str, Any]:
         return yaml.safe_load(f) or {}
 
 
+def get_pet_name(cfg: dict[str, Any]) -> str:
+    """读取桌宠显示名，缺省「七海」。"""
+    return (cfg.get("pet") or {}).get("name") or "七海"
+
+
 def resolve_api_key(provider: dict[str, Any]) -> str:
     """从 provider 配置的 api_key_env 指定的环境变量读取 key。本地服务无 key。"""
     env = provider.get("api_key_env", "")

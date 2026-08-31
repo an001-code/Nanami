@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>七海 · 仪表盘</title>
+<title>仪表盘</title>
 <style>
   :root {
     --bg: #14161c;
@@ -117,13 +117,17 @@
     width: 100%; max-width: 320px; background: var(--panel2); color: var(--text);
     border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 14px;
   }
+  select {
+    width: 100%; max-width: 320px; background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font-size: 14px;
+  }
   ul { margin: 0; padding-left: 20px; }
   li { margin: 4px 0; line-height: 1.5; }
 </style>
 </head>
 <body>
 <aside>
-  <div class="brand">七海 · 仪表盘</div>
+  <div class="brand" id="brand"></div>
   <nav id="nav"></nav>
 </aside>
 <main>
@@ -152,6 +156,8 @@
   var current = 'overview';
   var dirty = false;
   var pending = { llm: { provider: null, model: null }, live2d: { model: null } };
+  var importStatus = '';
+  var voiceCfg = null;
 
   function esc(s) {
     if (s === null || s === undefined) return '';
@@ -298,24 +304,66 @@
       var r = JSON.parse(raw);
       if (r.error) { content.innerHTML = banner(r.error); return; }
       var models = r.models || [], active = r.active;
-      if (!models.length) { content.innerHTML = empty('未找到模型目录（live2d/static/l2d/*）'); return; }
-      var sel = pending.live2d.model || active;
       content.innerHTML =
-        '<p class="muted">点击选择要启用的 Live2D 模型（保存后重启生效）</p>' +
-        models.map(function (m) {
-          return '<div class="card model' + (m === sel ? ' selected' : '') + '" data-model="' + esc(m) + '">' +
+        '<div class="section">' +
+        '<button class="primary" id="importModelBtn" style="margin-bottom:8px;">导入模型</button>' +
+        '<p class="muted" id="importHint">' + esc(importStatus) + '</p></div>' +
+        '<p class="muted">切换 = 立即重载；删除会先弹出确认框</p>' +
+        (models.length ? models.map(function (m) {
+          var isActive = m === active;
+          return '<div class="card model" data-model="' + esc(m) + '">' +
             '<div class="card-label">' + esc(m) +
-            (m === active ? ' <span class="badge ok">当前</span>' : '') + '</div>' +
-            '<button class="small">启用</button></div>';
-        }).join('');
-      content.querySelectorAll('.card.model').forEach(function (el) {
-        el.addEventListener('click', function () {
-          pending.live2d.model = el.dataset.model;
-          setDirty(true);
-          renderModels();
+            (isActive ? ' <span class="badge ok">当前</span>' : '') + '</div>' +
+            '<button class="small" data-act="switch"' + (isActive ? ' disabled' : '') + '>切换</button> ' +
+            '<button class="small" data-act="del"' + (isActive ? ' disabled' : '') + '>删除</button></div>';
+        }).join('') : '<p class="empty">未找到模型目录（live2d/static/l2d/*）</p>');
+      document.getElementById('importModelBtn').addEventListener('click', function () {
+        importStatus = '正在导入…';
+        document.getElementById('importHint').textContent = importStatus;
+        bridge.importModel(function (raw) {
+          var res = JSON.parse(raw);
+          if (res.cancelled) {
+            importStatus = '';
+            document.getElementById('importHint').textContent = '';
+          } else if (!res.ok) {
+            importStatus = '导入失败：' + (res.error || '');
+            document.getElementById('importHint').textContent = importStatus;
+          }
+        });
+      });
+      content.querySelectorAll('.card.model button[data-act="switch"]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var mid = btn.closest('.card').dataset.model;
+          bridge.applyModel(mid, function (raw) {
+            var res = JSON.parse(raw);
+            importStatus = res.ok ? ('已切换为 ' + mid) : ('切换失败：' + (res.error || ''));
+            document.getElementById('importHint').textContent = importStatus;
+          });
+        });
+      });
+      content.querySelectorAll('.card.model button[data-act="del"]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var mid = btn.closest('.card').dataset.model;
+          bridge.deleteModel(mid, function (raw) {
+            var res = JSON.parse(raw);
+            if (res.cancelled) { return; }
+            if (res.ok) {
+              importStatus = '已删除 ' + mid;
+              renderModels();
+            } else {
+              importStatus = '删除失败：' + (res.error || '');
+              document.getElementById('importHint').textContent = importStatus;
+            }
+          });
         });
       });
     });
+  }
+
+  function onImportResult(raw) {
+    var res = JSON.parse(raw);
+    importStatus = res.ok ? ('导入成功：' + (res.model || '')) : ('导入失败：' + (res.error || ''));
+    if (current === 'models') { renderModels(); }
   }
 
   function renderProviders() {
@@ -352,6 +400,153 @@
     });
   }
 
+  var EDGE_VOICES = [
+    'zh-CN-XiaoxiaoNeural', 'zh-CN-XiaoyiNeural', 'zh-CN-YunxiNeural',
+    'zh-CN-YunjianNeural', 'zh-CN-YunyangNeural', 'zh-CN-YunxiaNeural',
+    'zh-CN-XiaochenNeural', 'zh-CN-XiaohanNeural', 'zh-CN-XiaomengNeural',
+    'zh-CN-XiaomoNeural', 'zh-CN-XiaoqiuNeural', 'zh-CN-XiaoruiNeural',
+    'zh-CN-XiaoshuangNeural', 'zh-CN-XiaoxuanNeural', 'zh-CN-XiaoyanNeural',
+    'zh-CN-XiaoyouNeural', 'zh-CN-liaoning-XiaobeiNeural', 'zh-CN-shaanxi-XiaoniNeural'
+  ];
+
+  function renderVoice() {
+    bridge.getVoiceConfig(function (raw) {
+      voiceCfg = JSON.parse(raw) || {};
+      drawVoice();
+    });
+  }
+
+  function drawVoice() {
+    var t = voiceCfg || {};
+    var provider = t.provider || 'edge';
+    var radios = ['edge', 'cosyvoice', 'http'].map(function (p) {
+      return '<label style="display:inline-block;margin-right:16px;font-size:14px;">' +
+        '<input type="radio" name="ttsProvider" value="' + p + '"' +
+        (p === provider ? ' checked' : '') + '> ' + p + '</label>';
+    }).join('');
+
+    var fields = '';
+    if (provider === 'edge') {
+      var cur = t.voice || 'zh-CN-XiaoxiaoNeural';
+      var list = EDGE_VOICES.slice();
+      if (list.indexOf(cur) === -1) list.unshift(cur);
+      var opts = list.map(function (v) {
+        return '<option' + (v === cur ? ' selected' : '') + '>' + esc(v) + '</option>';
+      }).join('');
+      fields =
+        '<div class="section"><h3>音色</h3><select id="edgeVoice">' + opts + '</select></div>' +
+        '<div class="section"><h3>语速 rate</h3><input id="edgeRate" type="text" value="' + esc(t.rate || '+0%') + '"></div>' +
+        '<div class="section"><h3>音量 volume</h3><input id="edgeVolume" type="text" value="' + esc(t.volume || '+0%') + '"></div>' +
+        '<div class="section"><h3>音调 pitch</h3><input id="edgePitch" type="text" value="' + esc(t.pitch || '+0Hz') + '"></div>';
+    } else if (provider === 'cosyvoice') {
+      var c = t.cosyvoice || {};
+      fields =
+        '<div class="section"><h3>模型 model</h3><input id="cvModel" type="text" value="' + esc(c.model || 'cosyvoice-v3.5-plus') + '"></div>' +
+        '<div class="section"><h3>音色 ID（voice_id）</h3><input id="cvVoice" type="text" value="' + esc(c.voice || '') + '"></div>' +
+        '<div class="section"><h3>格式</h3><select id="cvFormat">' +
+        '<option' + ((c.format || 'mp3') === 'mp3' ? ' selected' : '') + '>mp3</option>' +
+        '<option' + ((c.format || 'mp3') === 'wav' ? ' selected' : '') + '>wav</option>' +
+        '</select></div>' +
+        '<div class="section"><h3>采样率</h3><input id="cvSample" type="text" value="' + esc(c.sample_rate || 24000) + '"></div>';
+    } else {
+      var h = t.http || {};
+      fields =
+        '<div class="section"><h3>URL</h3><input id="httpUrl" type="text" value="' + esc(h.url || '') + '"></div>';
+    }
+
+    content.innerHTML =
+      '<div class="section"><h3>Provider</h3>' + radios + '</div>' +
+      fields +
+      '<div class="section"><h3>试听</h3>' +
+      '<input id="previewText" type="text" placeholder="输入要试听的文字" style="max-width:100%;">' +
+      '<button class="primary" id="previewBtn" style="margin-top:8px;">试听</button>' +
+      '<audio id="previewAudio" controls style="display:none;margin-top:8px;"></audio></div>' +
+      '<div class="section"><button class="primary" id="saveVoice">保存（立即生效）</button> ' +
+      '<span id="voiceHint" class="muted"></span></div>';
+
+    content.querySelectorAll('input[name="ttsProvider"]').forEach(function (el) {
+      el.addEventListener('change', function () {
+        voiceCfg.provider = el.value;
+        drawVoice();
+      });
+    });
+
+    document.getElementById('saveVoice').addEventListener('click', function () {
+      collectVoice();
+      bridge.saveVoiceConfig(JSON.stringify(voiceCfg), function (raw) {
+        var r = JSON.parse(raw);
+        document.getElementById('voiceHint').textContent =
+          r.ok ? '已保存，立即生效' : ('保存失败：' + (r.error || ''));
+      });
+    });
+
+    document.getElementById('previewBtn').addEventListener('click', function () {
+      collectVoice();
+      var text = document.getElementById('previewText').value.trim();
+      if (!text) { document.getElementById('voiceHint').textContent = '请输入试听文字'; return; }
+      document.getElementById('voiceHint').textContent = '合成中…';
+      bridge.previewVoice(text, JSON.stringify(voiceCfg), function (raw) {
+        var r = JSON.parse(raw);
+        if (!r.ok) { document.getElementById('voiceHint').textContent = '试听失败：' + (r.error || ''); return; }
+        var audio = document.getElementById('previewAudio');
+        audio.src = 'data:' + r.mime + ';base64,' + r.base64;
+        audio.style.display = 'block';
+        document.getElementById('voiceHint').textContent = '';
+        audio.play();
+      });
+    });
+  }
+
+  function collectVoice() {
+    var p = voiceCfg.provider;
+    if (p === 'edge') {
+      voiceCfg.voice = document.getElementById('edgeVoice').value;
+      voiceCfg.rate = document.getElementById('edgeRate').value.trim();
+      voiceCfg.volume = document.getElementById('edgeVolume').value.trim();
+      voiceCfg.pitch = document.getElementById('edgePitch').value.trim();
+    } else if (p === 'cosyvoice') {
+      voiceCfg.cosyvoice = voiceCfg.cosyvoice || {};
+      voiceCfg.cosyvoice.model = document.getElementById('cvModel').value.trim();
+      voiceCfg.cosyvoice.voice = document.getElementById('cvVoice').value.trim();
+      voiceCfg.cosyvoice.format = document.getElementById('cvFormat').value;
+      voiceCfg.cosyvoice.sample_rate = parseInt(document.getElementById('cvSample').value, 10) || 24000;
+    } else if (p === 'http') {
+      voiceCfg.http = voiceCfg.http || {};
+      voiceCfg.http.url = document.getElementById('httpUrl').value.trim();
+    }
+  }
+
+  function applyNameToChrome(name) {
+    document.title = name + ' · 仪表盘';
+    var brand = document.getElementById('brand');
+    if (brand) brand.textContent = name + ' · 仪表盘';
+  }
+
+  function renderSettings() {
+    bridge.getPetName(function (raw) {
+      var r = JSON.parse(raw);
+      var name = (r && r.name) || '七海';
+      content.innerHTML =
+        '<div class="section"><h3>桌宠名称</h3>' +
+        '<input id="petName" type="text" value="' + esc(name) + '">' +
+        '<button class="primary" id="savePetName" style="margin-top:8px;">保存（立即生效）</button> ' +
+        '<span id="petNameHint" class="muted"></span></div>';
+      document.getElementById('savePetName').addEventListener('click', function () {
+        var n = document.getElementById('petName').value.trim();
+        if (!n) { document.getElementById('petNameHint').textContent = '名字不能为空'; return; }
+        bridge.savePetName(n, function (raw) {
+          var res = JSON.parse(raw);
+          if (res.ok) {
+            applyNameToChrome(n);
+            document.getElementById('petNameHint').textContent = '已保存，立即生效';
+          } else {
+            document.getElementById('petNameHint').textContent = '保存失败：' + (res.error || '');
+          }
+        });
+      });
+    });
+  }
+
   var tabs = [
     { id: 'overview', label: '总览', render: renderOverview },
     { id: 'history', label: '对话历史', render: renderHistory },
@@ -359,7 +554,9 @@
     { id: 'profile', label: '用户画像', render: renderProfile },
     { id: 'semantic', label: '语义记忆', render: renderSemantic },
     { id: 'models', label: '模型', render: renderModels },
-    { id: 'providers', label: '模型供应商', render: renderProviders }
+    { id: 'providers', label: '模型供应商', render: renderProviders },
+    { id: 'voice', label: '语音', render: renderVoice },
+    { id: 'settings', label: '设置', render: renderSettings }
   ];
 
   function selectTab(id) {
@@ -399,6 +596,11 @@
     });
     refreshBtn.addEventListener('click', function () { selectTab(current); });
     saveBtn.addEventListener('click', doSave);
+    bridge.import_finished.connect(onImportResult);
+    bridge.getPetName(function (raw) {
+      var r = JSON.parse(raw);
+      applyNameToChrome((r && r.name) || '七海');
+    });
     selectTab('overview');
   }
 

@@ -10,9 +10,9 @@ from .dashboard_bridge import DashboardBridge
 
 
 class DashboardWindow(QWidget):
-    def __init__(self, bridge: DashboardBridge, url: str) -> None:
+    def __init__(self, bridge: DashboardBridge, url: str, name: str = "七海") -> None:
         super().__init__()
-        self.setWindowTitle("七海 · 仪表盘")
+        self.setWindowTitle(f"{name} · 仪表盘")
         self.resize(1000, 720)
 
         self.view = QWebEngineView(self)
@@ -30,3 +30,6 @@ class DashboardWindow(QWidget):
         self.show()
         self.raise_()
         self.activateWindow()
+
+    def set_pet_name(self, name: str) -> None:
+        self.setWindowTitle(f"{name} · 仪表盘")

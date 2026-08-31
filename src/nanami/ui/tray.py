@@ -24,9 +24,10 @@ def create_tray(
     app: QApplication,
     window,
     open_dashboard: Callable[[], None] | None = None,
+    name: str = "七海",
 ) -> QSystemTrayIcon:
     tray = QSystemTrayIcon(_placeholder_icon(), app)
-    tray.setToolTip("七海 Nanami")
+    tray.setToolTip(name)
 
     menu = QMenu()
     menu.addAction("放大", window.zoom_in)

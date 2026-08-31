@@ -1,15 +1,10 @@
-# 智能桌宠 Agent 配置
-# API key 一律通过环境变量注入，不要写进本文件
-
+pet:
+  name: 七十
 llm:
-  # 当前使用的 provider（见 providers 键）
   provider: deepseek
-  # 对话使用的文本模型
   model: deepseek-chat
-  # 屏幕感知使用的视觉模型（需多模态能力）
   vision_model: qwen-vl-max
   temperature: 0.7
-
   providers:
     deepseek:
       base_url: https://api.deepseek.com
@@ -25,30 +20,35 @@ llm:
       api_key_env: OPENAI_API_KEY
     ollama:
       base_url: http://localhost:11434/v1
-      api_key_env: ""            # 本地模型无需 key
-
+      api_key_env: ''
 voice:
   tts:
-    # Edge TTS 音色（中文）
+    provider: cosyvoice
     voice: zh-CN-XiaoxiaoNeural
-    rate: "+0%"
-    volume: "+0%"
+    rate: +0%
+    volume: +0%
+    pitch: +0Hz
+    http:
+      url: http://127.0.0.1:9880/
+      out_format: wav
+    cosyvoice:
+      model: cosyvoice-v3.5-plus
+      voice: cosyvoice-v3.5-plus-bailian-3670d26ff80b4176b5beb1e9f55286f0
+      api_key_env: DASHSCOPE_API_KEY
+      format: mp3
+      sample_rate: 24000
   stt:
-    # faster-whisper 模型大小
     model: base
-
 permissions:
-  # 默认裁决：ask / allow / deny
   default: ask
   allowlist: []
   denylist: []
-
 memory:
   postgres:
     dsn: postgresql://nanami:nanami@127.0.0.1:5432/nanami
   redis:
     url: redis://127.0.0.1:6390/0
-    key_prefix: "nanami:"
+    key_prefix: 'nanami:'
   vector:
     path: data/chroma
     collection: conversation_summaries
@@ -68,15 +68,9 @@ memory:
   worker:
     queue_size: 100
     shutdown_timeout_sec: 5
-
-# 工作区：file_ops 工具的读写被限制在此目录内
 workspace:
   root: workspace
-
-# Live2D 模型：static 目录下的 l2d/<model> 目录名
 live2d:
-  model: LSS
-
-# MCP 外部 server（Phase 2）
+  model: hiyori_pro_t11
 mcp:
   servers: []
